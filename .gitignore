@@ -1,0 +1,11 @@
+# Tracker backups contain real applications and personal notes — never commit them
+job-tracker-backup-*.json
+
+# Local Claude Code settings (personal permissions)
+.claude/settings.local.json
+CLAUDE.md
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+.claude/launch.json

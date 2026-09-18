@@ -4,7 +4,9 @@ A job-application tracker that runs entirely in your browser. It's one HTML file
 
 ## Use it
 
-Download `job_tracker.html` and open it in your browser. Then go to **Export → Your details** and add your name.
+**[Open it in your browser](https://ajsgamedev.github.io/JobTracker/job_tracker.html)**, with nothing to install. It's the full app, not a demo: your entries are saved in your browser, just like the downloaded version.
+
+Or download `job_tracker.html` and open it locally; it works fully offline. Either way, go to **Export → Your details** and add your name.
 
 ## Your data stays with you
 

@@ -22,6 +22,7 @@ Your applications are saved in your browser's local storage, on your own compute
 - Track each application from **To Apply** through **Applied** or **Speculative**, numbered interview rounds, and the outcome. **Talent Pool** and **On Hold** cover processes that are parked rather than dead.
 - An **Action Needed** panel for closing deadlines, overdue follow-ups, upcoming interviews, and applications that have gone quiet. Speculative applications wait 30 days before nudging you, not 14.
 - A **funnel** showing your response rate by application method and how far you get through interview rounds.
+- A **flow diagram** (a Sankey chart) of where your applications went: no reply, rejected after the 2nd interview, offer, and so on. Hover over an end point to see which companies are in it. Save it as an image to share; the image doesn't include company names.
 - **Archive** finished applications to keep your list short; they still count in your stats and report.
 - **Add interviews to your calendar**: each upcoming step can be downloaded as a calendar event.
 - **Pick your own app colour** under Export → Your details, or paste one in as `rgb(30, 58, 95)` or `#1E3A5F`.
@@ -42,9 +43,9 @@ All companies and people shown are made up.
   <img src="screenshots/report.png" alt="The printable job application report with monthly and per-status charts above a dated table of applications" width="440">
 </p>
 
-**The whole dashboard**, including the funnel from application to offer:
+**The whole dashboard**, including the funnel and the flow diagram at the bottom:
 
-<img src="screenshots/dashboard.png" alt="The full dashboard: action needed, charts, status counts, and a funnel from applied through three interview rounds to offers" width="720">
+<img src="screenshots/dashboard.png" alt="The full dashboard: action needed, charts, status counts, a funnel from applied through three interview rounds to offers, and a flow diagram showing where each application ended up" width="720">
 
 ## License
 

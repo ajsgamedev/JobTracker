@@ -1187,6 +1187,161 @@ function FunnelStats({
     }
   }, "(", r.responded, "/", r.total, ")"))))));
 }
+// Saves an on-screen SVG as a 2x PNG on the given background, with a margin.
+function saveSvgAsPng(svg, filename, background) {
+  // A standalone image can't see the page's CSS variables or fonts: bake in the current
+  // accent colours and embed the @font-face rules (the fonts are already inline in this file).
+  const root = getComputedStyle(document.documentElement);
+  const fonts = [...document.styleSheets].flatMap(s => [...s.cssRules]).filter(r => r instanceof CSSFontFaceRule).map(r => r.cssText).join("");
+  const markup = new XMLSerializer().serializeToString(svg).replace(/var\((--[\w-]+)\)/g, (_, v) => root.getPropertyValue(v).trim()).replace(">", () => `><style>${fonts}</style>`);
+  const w = svg.width.baseVal.value,
+    h = svg.height.baseVal.value,
+    margin = 24,
+    scale = 2;
+  const fail = () => alert("Couldn't create the image in this browser. A screenshot works too.");
+  const img = new Image();
+  img.onerror = fail;
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = (w + 2 * margin) * scale;
+    canvas.height = (h + 2 * margin) * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, w + 2 * margin, h + 2 * margin);
+    ctx.drawImage(img, margin, margin, w, h);
+    try {
+      canvas.toBlob(blob => blob ? downloadFile(filename, blob, "image/png") : fail(), "image/png");
+    } catch (e) {
+      fail(); // browsers that treat the SVG as foreign content block reading the canvas back
+    }
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markup);
+}
+function SankeyChart({
+  t,
+  apps
+}) {
+  const wrapRef = useRef(null);
+  const svgRef = useRef(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const spine = buildSankey(apps);
+  const L = spine.length ? sankeyLayout(spine, width) : null;
+  const count = v => /*#__PURE__*/React.createElement("tspan", {
+    fill: t.muted,
+    style: {
+      fontFamily: "'Space Grotesk', monospace"
+    }
+  }, " ", v);
+  // Hover text for a flow, and for the end point it feeds: the numbers, then which companies.
+  // Only on screen: the saved image never shows it, so company names stay out of anything shared.
+  const tip = f => `${f.from.label} → ${f.to.label}: ${f.to.value} of ${f.from.value} (${Math.round(f.to.value / f.from.value * 100)}%)` + (f.to.companies ? "\n\n" + f.to.companies.slice().sort((x, y) => x.localeCompare(y)).join("\n") : "");
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    ref: wrapRef,
+    style: {
+      overflowX: "auto"
+    }
+  }, !L ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: t.muted
+    }
+  }, "Add applications to see where they lead.") : /*#__PURE__*/React.createElement("svg", {
+    ref: svgRef,
+    width: L.W,
+    height: L.H,
+    role: "img",
+    "aria-label": "Flow of applications through responses and interview rounds to where each one ended up",
+    style: {
+      display: "block",
+      fontFamily: "Inter, system-ui, sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("g", {
+    transform: `translate(0 ${L.TOP})`
+  }, L.flows.map((f, i) => {
+    const x0 = f.from.x + L.NODE,
+      x1 = f.to.x,
+      m = (x0 + x1) / 2,
+      y0 = f.y0,
+      y1 = f.to.y,
+      h = f.to.h;
+    return /*#__PURE__*/React.createElement("path", {
+      key: "f" + i,
+      d: `M${x0},${y0}C${m},${y0} ${m},${y1} ${x1},${y1}L${x1},${y1 + h}C${m},${y1 + h} ${m},${y0 + h} ${x0},${y0 + h}Z`,
+      fillOpacity: 0.35,
+      style: {
+        fill: f.to.color || ACCENT
+      }
+    }, /*#__PURE__*/React.createElement("title", null, tip(f)));
+  }), L.stages.map((s, i) => /*#__PURE__*/React.createElement("g", {
+    key: "s" + i
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: s.x,
+    y: 0,
+    width: L.NODE,
+    height: s.h,
+    style: {
+      fill: ACCENT_DEEP
+    }
+  }), /*#__PURE__*/React.createElement("text", {
+    x: s.x,
+    y: -8,
+    fontSize: 12,
+    fill: t.ink
+  }, s.label, ":", count(s.value)))), L.ends.map((e, i) => /*#__PURE__*/React.createElement("g", {
+    key: "e" + i
+  }, /*#__PURE__*/React.createElement("title", null, tip(L.flows.find(f => f.to === e))), /*#__PURE__*/React.createElement("rect", {
+    x: e.x,
+    y: e.y,
+    width: L.NODE,
+    height: Math.max(e.h, 1),
+    style: {
+      fill: e.color
+    }
+  }), /*#__PURE__*/React.createElement("text", {
+    x: e.x + L.NODE + 6,
+    y: e.y + e.h / 2,
+    dominantBaseline: "central",
+    fontSize: 12,
+    fill: t.ink
+  }, e.label, ":", count(e.value))))))), L && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: t.muted
+    }
+  }, "Hover over an end point to see which companies it holds."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => saveSvgAsPng(svgRef.current, `application-flow-${todayISO()}.png`, t.cardBg),
+    className: "jt-btn",
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      background: t.cardBg,
+      color: t.ink,
+      border: `1px solid ${t.border}`,
+      borderRadius: 8,
+      padding: "7px 12px",
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(IconDownload, {
+    size: 14
+  }), " Save as image (.png)")));
+}
 
 /* ---------- main app ---------- */
 function JobTracker() {
@@ -1421,7 +1576,8 @@ function JobTracker() {
     status: s,
     count: stats.byStatus[s] || 0
   })).filter(d => d.count > 0), [stats]);
-  const funnelStats = useMemo(() => buildFunnelStats(apps.filter(a => a.status !== "To Apply")), [apps]);
+  const submittedApps = useMemo(() => apps.filter(a => a.status !== "To Apply"), [apps]);
+  const funnelStats = useMemo(() => buildFunnelStats(submittedApps), [submittedApps]);
   const exportApps = useMemo(() => apps.filter(a => a.status !== "To Apply" && a.dateApplied && a.dateApplied >= exportFrom && a.dateApplied <= exportTo).sort((a, b) => (a.dateApplied || "").localeCompare(b.dateApplied || "")), [apps, exportFrom, exportTo]);
   function triggerPrint() {
     // Browsers name the saved PDF after the page title.
@@ -1642,13 +1798,27 @@ function JobTracker() {
       fontWeight: 600,
       color: ACCENT_DEEP
     }
-  }, stats.byStatus[s] || 0))))), /*#__PURE__*/React.createElement(Card, {
+  }, stats.byStatus[s] || 0))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      // minmax(0, …): a grid column otherwise grows to fit the wide flow chart, instead of letting it scroll.
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gap: 16,
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement(Card, {
     t: t,
     title: "Funnel"
   }, /*#__PURE__*/React.createElement(FunnelStats, {
     t: t,
     funnel: funnelStats
-  }))), view === "list" && /*#__PURE__*/React.createElement(ListView, {
+  })), /*#__PURE__*/React.createElement(Card, {
+    t: t,
+    title: "Where applications went"
+  }, /*#__PURE__*/React.createElement(SankeyChart, {
+    t: t,
+    apps: submittedApps
+  })))), view === "list" && /*#__PURE__*/React.createElement(ListView, {
     t: t,
     filtered: filtered,
     showArchived: showArchived,
@@ -2041,6 +2211,101 @@ function buildFunnelStats(apps) {
     medianResponseDays,
     roundCounts,
     maxRound
+  };
+}
+
+/* ---------- flow diagram (Sankey) ----------
+   Every application takes one path: Applications → Responded → 1st interview → … → where it
+   ended. So the diagram is a tree: a row of stages along the top, with each stage's end
+   points ("Rejected", "Offer", …) hanging below the next column. No flows ever cross. */
+// Pending statuses fold together: the diagram shows where things stand, not the paperwork.
+const SANKEY_END = {
+  Applied: "Awaiting Reply",
+  Speculative: "Awaiting Reply",
+  Interview: "In Progress"
+};
+const SANKEY_ORDER = ["Offer", "In Progress", "Talent Pool", "On Hold", "Awaiting Reply", "Withdrawn", "Rejected", "No Reply"];
+function buildSankey(apps) {
+  const reached = [],
+    ends = [];
+  apps.forEach(a => {
+    // Same interview rule as the funnel. An interview also counts as a response, even when
+    // the status says otherwise (e.g. No Reply after a 1st interview: ghosted).
+    const rounds = Math.max(maxLoggedRound(a), a.status === "Interview" || a.status === "Offer" ? 1 : 0);
+    const depth = rounds > 0 || RESPONDED_STATUSES.includes(a.status) ? rounds + 1 : 0;
+    for (let i = 0; i <= depth; i++) reached[i] = (reached[i] || 0) + 1;
+    const label = SANKEY_END[a.status] || a.status;
+    const bucket = ends[depth] || (ends[depth] = {});
+    if (!bucket[label]) bucket[label] = {
+      label,
+      value: 0,
+      color: STATUS_COLOR[label] || STATUS_COLOR.Applied,
+      companies: []
+    };
+    bucket[label].value++;
+    bucket[label].companies.push([a.company, a.role].filter(Boolean).join(" · "));
+  });
+  return reached.map((value, i) => ({
+    label: i === 0 ? "Applications" : i === 1 ? "Responded" : `${ordinal(i - 1)} interview`,
+    value,
+    ends: Object.values(ends[i] || {}).sort((x, y) => SANKEY_ORDER.indexOf(x.label) - SANKEY_ORDER.indexOf(y.label))
+  }));
+}
+function sankeyLayout(spine, width) {
+  const BAND = 200; // height of the whole flow
+  const PAD = 16; // gap between end points; keeps their labels apart
+  const NODE = 10;
+  const TOP = 24; // stage labels sit above the top row
+  const RIGHT = 120; // room for the last column's labels
+  const COL = 110; // narrowest column spacing before the chart scrolls sideways
+  const cols = spine.length + 1;
+  const W = Math.max(width, (cols - 1) * COL + NODE + RIGHT);
+  const step = (W - NODE - RIGHT) / (cols - 1);
+  const k = BAND / spine[0].value;
+  // Right to left: a column's end points go below every flow crossing the gap to their
+  // right, because their labels are drawn in that gap.
+  const ends = [];
+  let bottom = 0;
+  for (let c = cols - 1; c >= 1; c--) {
+    let y = c === cols - 1 ? 0 : bottom + PAD;
+    ends[c] = spine[c - 1].ends.map(e => {
+      const n = {
+        ...e,
+        x: c * step,
+        y,
+        h: e.value * k
+      };
+      y += n.h + PAD;
+      return n;
+    });
+    bottom = Math.max(bottom, c < spine.length ? spine[c].value * k : 0, y - PAD);
+  }
+  const stages = spine.map((s, i) => ({
+    ...s,
+    x: i * step,
+    y: 0,
+    h: s.value * k
+  }));
+  const flows = [];
+  stages.forEach((s, i) => {
+    let slot = 0;
+    (stages[i + 1] ? [stages[i + 1], ...ends[i + 1]] : ends[i + 1]).forEach(to => {
+      flows.push({
+        from: s,
+        to,
+        y0: slot
+      });
+      slot += to.h;
+    });
+  });
+  return {
+    W,
+    H: TOP + Math.max(bottom, BAND) + 8,
+    TOP,
+    NODE,
+    stages,
+    ends: ends.flat(),
+    flows
   };
 }
 function PanelRow({
